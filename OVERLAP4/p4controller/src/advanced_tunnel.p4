@@ -79,7 +79,6 @@ parser MyParser(packet_in packet,
             default: accept;
         }
     }
-
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
         transition accept;
@@ -106,6 +105,7 @@ control MyIngress(inout headers hdr,
 
     counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) ingressTunnelCounter;
     counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) egressTunnelCounter;
+    //counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) transientTunnelCounter;
 
     action drop() {
         mark_to_drop();
@@ -127,6 +127,7 @@ control MyIngress(inout headers hdr,
     }
 
     action myTunnel_forward(egressSpec_t port) {
+        //transientTunnelCounter.count((bit<32>) hdr.myTunnel.dst_id);
         standard_metadata.egress_spec = port;
     }
 
@@ -150,6 +151,7 @@ control MyIngress(inout headers hdr,
         }
         size = 1024;
         default_action = NoAction();
+
     }
 
     table myTunnel_exact {
