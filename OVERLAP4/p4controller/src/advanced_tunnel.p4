@@ -105,7 +105,7 @@ control MyIngress(inout headers hdr,
 
     counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) ingressTunnelCounter;
     counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) egressTunnelCounter;
-    //counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) transientTunnelCounter;
+    counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) transientTunnelCounter;
 
     action drop() {
         mark_to_drop();
@@ -127,7 +127,7 @@ control MyIngress(inout headers hdr,
     }
 
     action myTunnel_forward(egressSpec_t port) {
-        //transientTunnelCounter.count((bit<32>) hdr.myTunnel.dst_id);
+        transientTunnelCounter.count((bit<32>) hdr.myTunnel.dst_id);
         standard_metadata.egress_spec = port;
     }
 
@@ -187,7 +187,31 @@ control MyIngress(inout headers hdr,
 control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
-    apply {  }
+
+    counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) egressCounter;
+
+
+    action count_egress() {
+        egressCounter.count((bit<32>) hdr.myTunnel.dst_id);
+    }
+
+
+    table out_counter {
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            count_egress;
+            NoAction;
+        }
+        size = 1024;
+        default_action = count_egress();
+
+    }
+
+    apply { 
+        out_counter.apply();	
+    }
 }
 
 /*************************************************************************
