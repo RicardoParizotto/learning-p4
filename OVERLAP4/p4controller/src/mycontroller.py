@@ -29,9 +29,8 @@ def writeIpv4Rule(p4info_helper, ingress_sw, dst_ip_addr, switch_port):
         })
     ingress_sw.WriteTableEntry(table_entry)
     print "Installed ingress tunnel rule on %s" % ingress_sw.name  
-'''
 
-def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, tunnel_id):
+    def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, tunnel_id):
     table_entry = p4info_helper.buildTableEntry(
         table_name="MyIngress.ipv4_lpm",
         match_fields={
@@ -40,6 +39,28 @@ def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, tunnel_id):
         action_name="MyIngress.myTunnel_ingress",
         action_params={
             "dst_id": tunnel_id,
+        })
+    ingress_sw.WriteTableEntry(table_entry)
+    print "Installed ingress tunnel rule on %s" % ingress_sw.name  
+'''
+
+
+
+
+
+
+
+
+def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, ecmp_base, ecmp_max):
+    table_entry = p4info_helper.buildTableEntry(
+        table_name="MyIngress.ipv4_lpm",
+        match_fields={
+            "hdr.ipv4.dstAddr": (dst_ip_addr, 32)
+        },
+        action_name="MyIngress.myTunnel_ingress",
+        action_params={
+            "ecmp_base": ecmp_base,
+            "ecmp_count": ecmp_max,
         })
     ingress_sw.WriteTableEntry(table_entry)
     print "Installed ingress tunnel rule on %s" % ingress_sw.name  
@@ -274,19 +295,31 @@ def main(p4info_file_path, bmv2_file_path):
     #writeIpv4Rule(p4info_helper, ingress_sw=s5, dst_ip_addr="10.0.7.3", switch_port=7)
     #writeIpv4Rule(p4info_helper, ingress_sw=s5, dst_ip_addr="10.0.7.3", switch_port=7)
 
-    writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", tunnel_id=100)    
-    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=100, switch_port=4)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=100, switch_port=2)
+    writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", ecmp_base=2, ecmp_max=2)    
+
+   # writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", tunnel_id=1)    
+   
+    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=1, switch_port=4)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=1, switch_port=2)
     #writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=100, switch_port=7)
-    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=100, dst_eth_addr="00:00:00:00:07:03")
+    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=1, dst_eth_addr="00:00:00:00:07:03")
 
 
-    writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.1", tunnel_id=200)    
-    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=200, switch_port=3)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=200, switch_port=2)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=200, switch_port=1)
-    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=200, dst_eth_addr="00:00:00:00:01:01")
+    #writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.0.2", tunnel_id=2)   
+
+    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=2, switch_port=2) 
+    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=2, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=2, switch_port=3)
+    #writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=100, switch_port=7)
+    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=2, dst_eth_addr="00:00:00:00:07:03")
+
     
+    #writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.1", tunnel_id=3)    
+    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=3, switch_port=3)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=3, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=3, switch_port=1)
+    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=3, dst_eth_addr="00:00:00:00:01:01")
+
 
     '''
     writeTunnelRules(p4info_helper, ingress_sw=s1, egress_sw=s2, tunnel_id=100,
@@ -311,12 +344,12 @@ def main(p4info_file_path, bmv2_file_path):
         while True:
             sleep(2)
             print '\n----- Reading tunnel counters -----'
-            printCounter(p4info_helper, s1, "MyIngress.ingressTunnelCounter", 100)
-            printCounter(p4info_helper, s1, "MyIngress.transientTunnelCounter", 100)
-            printCounter(p4info_helper, s1, "MyEgress.egressCounter", 100)
-            printCounter(p4info_helper, s4, "MyIngress.transientTunnelCounter", 100)
-            printCounter(p4info_helper, s4, "MyEgress.egressCounter", 100)
-            printCounter(p4info_helper, s7, "MyIngress.egressTunnelCounter", 100)
+            printCounter(p4info_helper, s1, "MyIngress.ingressTunnelCounter", 1)
+            printCounter(p4info_helper, s1, "MyIngress.transientTunnelCounter", 1)
+            printCounter(p4info_helper, s1, "MyEgress.egressCounter", 1)
+            printCounter(p4info_helper, s4, "MyIngress.transientTunnelCounter", 1)
+            printCounter(p4info_helper, s4, "MyEgress.egressCounter", 1)
+            printCounter(p4info_helper, s7, "MyIngress.egressTunnelCounter", 1)
     except KeyboardInterrupt:
         print " Shutting down."
 

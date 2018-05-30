@@ -133,9 +133,18 @@ control MyIngress(inout headers hdr,
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
-    action myTunnel_ingress(bit<16> dst_id) {
+    action myTunnel_ingress(bit<16> ecmp_base, bit<32> ecmp_count){
+
+        hash(meta.ecmp_select,
+	    HashAlgorithm.crc16,
+	    ecmp_base,
+	    { hdr.ipv4.srcAddr,
+	      hdr.ipv4. fragOffset},
+	    ecmp_count);
+
+
         hdr.myTunnel.setValid();
-        hdr.myTunnel.dst_id = dst_id;
+        hdr.myTunnel.dst_id = (bit<16>) meta.ecmp_select;
         hdr.myTunnel.proto_id = hdr.ethernet.etherType;
         hdr.ethernet.etherType = TYPE_MYTUNNEL;
         ingressTunnelCounter.count((bit<32>) hdr.myTunnel.dst_id);
