@@ -279,6 +279,13 @@ def main(p4info_file_path, bmv2_file_path):
     writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=100, switch_port=2)
     #writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=100, switch_port=7)
     writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=100, dst_eth_addr="00:00:00:00:07:03")
+
+
+    writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.1", tunnel_id=200)    
+    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=200, switch_port=3)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=200, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=200, switch_port=1)
+    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=200, dst_eth_addr="00:00:00:00:01:01")
     
 
     '''
