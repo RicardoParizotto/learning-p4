@@ -63,6 +63,7 @@ struct headers {
     ethernet_t   ethernet;
     myTunnel_t   myTunnel;
     ipv4_t       ipv4;
+    tcp_t	 tcp;
 }
 
 /*************************************************************************
@@ -96,6 +97,14 @@ parser MyParser(packet_in packet,
     }
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
+        transition select(hdr.ipv4.protocol){
+           6: parse_tcp;
+           default: accept;
+        }
+    }
+
+    state parse_tcp {
+        packet.extract(hdr.tcp);
         transition accept;
     }
 
@@ -125,6 +134,24 @@ control MyIngress(inout headers hdr,
     action drop() {
         mark_to_drop();
     }
+
+    action set_ecmp(bit<16> ecmp_base, bit<32> ecmp_count) {
+        hash(meta.ecmp_select,
+	    HashAlgorithm.crc16,
+	    ecmp_base,
+	    { hdr.ipv4.srcAddr,
+	      hdr.ipv4.dstAddr,
+              hdr.ipv4.protocol,
+              hdr.tcp.srcPort,
+              hdr.tcp.dstPort },
+	    ecmp_count);
+
+        hdr.myTunnel.setValid();
+        hdr.myTunnel.dst_id = (bit<16>) meta.ecmp_select;
+        hdr.myTunnel.proto_id = hdr.ethernet.etherType;
+        hdr.ethernet.etherType = TYPE_MYTUNNEL;
+        ingressTunnelCounter.count((bit<32>) hdr.myTunnel.dst_id);
+    }
     
     action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
 	egressTunnelCounter.count((bit<32>) port);
@@ -135,15 +162,6 @@ control MyIngress(inout headers hdr,
     }
 
     action myTunnel_ingress(bit<16> dst_id){
- 	/*
-        hash(meta.ecmp_select,
-	    HashAlgorithm.crc16,
-	    ecmp_base,
-	    { hdr.ipv4.srcAddr,
-	      hdr.ipv4. fragOffset},
-	    ecmp_count);
-	*/
-
         hdr.myTunnel.setValid();
         hdr.myTunnel.dst_id = dst_id;
         hdr.myTunnel.proto_id = hdr.ethernet.etherType;
@@ -170,6 +188,7 @@ control MyIngress(inout headers hdr,
         actions = {
             ipv4_forward;
             myTunnel_ingress;
+            set_ecmp;
             drop;
             NoAction;
         }
@@ -246,7 +265,6 @@ control MyEgress(inout headers hdr,
         }
         size = 1024;
         default_action = count_egress();
-
     }
 
     apply { 
@@ -287,6 +305,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.myTunnel);
         packet.emit(hdr.ipv4);
+        packet.emit(hdr.tcp);
     }
 }
 

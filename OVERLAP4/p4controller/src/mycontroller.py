@@ -57,6 +57,21 @@ def writeIpv4Rule(p4info_helper, ingress_sw, dst_ip_addr, switch_port):
 '''
 
 
+def writeBalancingEntry(p4info_helper, ingress_sw, dst_ip_addr, ecmp_base, ecmp_count, prefix_size):
+    table_entry = p4info_helper.buildTableEntry(
+        table_name="MyIngress.ipv4_lpm",
+        match_fields={
+            "hdr.ipv4.dstAddr": (dst_ip_addr, prefix_size)
+        },
+        action_name="MyIngress.set_ecmp",
+        action_params={
+            "ecmp_base": ecmp_base,
+            "ecmp_count": ecmp_count
+        })
+    ingress_sw.WriteTableEntry(table_entry)
+    print "Installed ingress tunnel rule on %s" % ingress_sw.name
+
+
 
 def writeFknEgress(p4info_helper, ingress_sw, dst_ip_addr, dst_addr, switch_port):
     table_entry = p4info_helper.buildTableEntry(
@@ -78,11 +93,11 @@ def writeFknEgress(p4info_helper, ingress_sw, dst_ip_addr, dst_addr, switch_port
 1) An tunnel ingress rule on the ingress switch in the ipv4_lpm table that
        encapsulates traffic into a tunnel with the specified ID
 '''
-def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, tunnel_id):
+def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, tunnel_id, prefix_size):
     table_entry = p4info_helper.buildTableEntry(
         table_name="MyIngress.ipv4_lpm",
         match_fields={
-            "hdr.ipv4.dstAddr": (dst_ip_addr, 32)
+            "hdr.ipv4.dstAddr": (dst_ip_addr, prefix_size)
         },
         action_name="MyIngress.myTunnel_ingress",
         action_params={
@@ -252,36 +267,39 @@ def main(p4info_file_path, bmv2_file_path):
     print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s7.name
 
     # Write the rules that tunnel traffic from h1 to h3
-    writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", tunnel_id=1)          
-    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=1, switch_port=6)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=1, switch_port=2)
-    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=1, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
+    writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", tunnel_id=3, prefix_size=32)          
+    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=3, switch_port=6)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=3, switch_port=2)
+    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=3, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
 
-    
-    writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.1", tunnel_id=4)
-    writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.4", tunnel_id=4)
-    writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.5", tunnel_id=4)         
-    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=4, switch_port=2)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=4, switch_port=1)    
-    #writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=4, dst_eth_addr="00:00:00:00:01:01", switch_port=1)
-    #writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=4, dst_eth_addr="00:00:00:00:01:05", switch_port=2) 
-    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=4, dst_eth_addr="00:00:00:00:01:04", switch_port=3)
+
+    #essa linha que tem que mudar
+    #writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.0", tunnel_id=1, prefix_size=24)
+    #jklasdfjalsjdf;asdf
+
+    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=1, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=1, switch_port=1)    
+    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=1, dst_eth_addr="00:00:00:00:01:04", switch_port=3)
+
+    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=2, switch_port=3)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=2, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=2, switch_port=1)
+    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=2, dst_eth_addr="00:00:00:00:01:01", switch_port=1)   
+
+
+    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=4, switch_port=2) 
+    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=4, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=4, switch_port=3)
+    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=4, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
+
+
+    writeBalancingEntry(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.0", ecmp_base=1, ecmp_count=2 , prefix_size=24)
+
+    #back to the border switch
     writeFknEgress(p4info_helper, s1, "10.0.1.1", "00:00:00:00:01:01", 1)
     writeFknEgress(p4info_helper, s1, "10.0.1.5", "00:00:00:00:01:05", 3)
     writeFknEgress(p4info_helper, s1, "10.0.1.4", "00:00:00:00:01:04", 2)
     
-    '''
-    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=3, switch_port=3)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=3, switch_port=2)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=3, switch_port=1)
-    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=3, dst_eth_addr="00:00:00:00:01:01")   
-
-
-    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=2, switch_port=2) 
-    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=2, switch_port=2)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=2, switch_port=3)
-    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=2, dst_eth_addr="00:00:00:00:07:03")
-    '''
 
     # TODO Uncomment the following two lines to read table entries from s1 and s2
     readTableRules(p4info_helper, s1)
