@@ -215,102 +215,86 @@ def main(p4info_file_path, bmv2_file_path):
     # Instantiate a P4 Runtime helper from the p4info file
     p4info_helper = p4runtime_lib.helper.P4InfoHelper(p4info_file_path)
 
+    switches = {}
+
     # Create switch connection objects;
     # this is backed by a P4 Runtime gRPC connection
-    # use a dict here  //ricardo
 
-    s1 = p4runtime_lib.bmv2.Bmv2SwitchConnection('s1', 
+    switches["s1"] = p4runtime_lib.bmv2.Bmv2SwitchConnection('s1', 
                                                  address='127.0.0.1:50051',
-                                                 device_id=0)
-    s2 = p4runtime_lib.bmv2.Bmv2SwitchConnection('s2', 
+                                                 device_id=0) 
+    switches["s2"] = p4runtime_lib.bmv2.Bmv2SwitchConnection('s2', 
                                                  address='127.0.0.1:50052',
-                                                 device_id=1)
-    s3 = p4runtime_lib.bmv2.Bmv2SwitchConnection('s3', 
+                                                 device_id=1)     
+    switches["s3"] = p4runtime_lib.bmv2.Bmv2SwitchConnection('s3', 
                                                  address='127.0.0.1:50053',
                                                  device_id=2)
-    s4 = p4runtime_lib.bmv2.Bmv2SwitchConnection('s4', 
+    switches["s4"] = p4runtime_lib.bmv2.Bmv2SwitchConnection('s4', 
                                                  address='127.0.0.1:50054',
                                                  device_id=3)
-    s5 = p4runtime_lib.bmv2.Bmv2SwitchConnection('s5', 
+    switches["s5"] = p4runtime_lib.bmv2.Bmv2SwitchConnection('s5', 
                                                  address='127.0.0.1:50055',
                                                  device_id=4)
-    s6 = p4runtime_lib.bmv2.Bmv2SwitchConnection('s6', 
+    switches["s6"] = p4runtime_lib.bmv2.Bmv2SwitchConnection('s6', 
                                                  address='127.0.0.1:50056',
                                                  device_id=5)
-    s7 = p4runtime_lib.bmv2.Bmv2SwitchConnection('s7', 
+    switches["s7"] = p4runtime_lib.bmv2.Bmv2SwitchConnection('s7', 
                                                  address='127.0.0.1:50057',
                                                  device_id=6)
 
-
-
     # Install the P4 program on switches
-    s1.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
+    for k, sw in switches.items():
+        sw.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
                                    bmv2_json_file_path=bmv2_file_path)
-    print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s1.name
-    s2.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
-                                   bmv2_json_file_path=bmv2_file_path)
-    print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s2.name
-    s3.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
-                                   bmv2_json_file_path=bmv2_file_path)
-    print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s3.name
-    s4.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
-                                   bmv2_json_file_path=bmv2_file_path)
-    print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s4.name
-    s5.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
-                                   bmv2_json_file_path=bmv2_file_path)
-    print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s5.name
-    s6.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
-                                   bmv2_json_file_path=bmv2_file_path)
-    print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s6.name
-    s7.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
-                                   bmv2_json_file_path=bmv2_file_path)
-    print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s7.name
+        print "Installed P4 Program using SetForwardingPipelineConfig on %s" % sw.name
+
+
 
     # Write the rules that tunnel traffic from h1 to h3
-    writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", tunnel_id=3, prefix_size=32)          
-    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=3, switch_port=6)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=3, switch_port=2)
-    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=3, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
-
+    writeTunnelIngress(p4info_helper, ingress_sw=switches["s1"], dst_ip_addr="10.0.7.3", tunnel_id=3, prefix_size=32)          
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s1"], tunnel_id=3, switch_port=6)
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s4"], tunnel_id=3, switch_port=2)
+    writeTunnelEgress(p4info_helper, egress_sw=switches["s7"], tunnel_id=3, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
 
     #essa linha que tem que mudar
-    #writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.0", tunnel_id=1, prefix_size=24)
+    writeTunnelIngress(p4info_helper, ingress_sw=switches["s7"], dst_ip_addr="10.0.1.0", tunnel_id=2, prefix_size=24)
     #jklasdfjalsjdf;asdf
 
-    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=1, switch_port=2)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=1, switch_port=1)    
-    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=1, dst_eth_addr="00:00:00:00:01:04", switch_port=3)
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s7"], tunnel_id=1, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s4"], tunnel_id=1, switch_port=1)    
+    writeTunnelEgress(p4info_helper, egress_sw=switches["s1"], tunnel_id=1, dst_eth_addr="00:00:00:00:01:04", switch_port=3)
 
-    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=2, switch_port=3)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=2, switch_port=2)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=2, switch_port=1)
-    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=2, dst_eth_addr="00:00:00:00:01:01", switch_port=1)   
-
-
-    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=4, switch_port=2) 
-    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=4, switch_port=2)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=4, switch_port=3)
-    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=4, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s7"], tunnel_id=2, switch_port=3)
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s5"], tunnel_id=2, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s2"], tunnel_id=2, switch_port=1)
+    writeTunnelEgress(p4info_helper, egress_sw=switches["s1"], tunnel_id=2, dst_eth_addr="00:00:00:00:01:01", switch_port=1)   
 
 
-    writeBalancingEntry(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.0", ecmp_base=1, ecmp_count=2 , prefix_size=24)
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s1"], tunnel_id=4, switch_port=2) 
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s2"], tunnel_id=4, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=switches["s5"], tunnel_id=4, switch_port=3)
+    writeTunnelEgress(p4info_helper, egress_sw=switches["s7"], tunnel_id=4, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
+
+
+    #writeBalancingEntry(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.0", ecmp_base=1, ecmp_count=2 , prefix_size=24)
 
     #back to the border switch
-    writeFknEgress(p4info_helper, s1, "10.0.1.1", "00:00:00:00:01:01", 1)
-    writeFknEgress(p4info_helper, s1, "10.0.1.5", "00:00:00:00:01:05", 3)
-    writeFknEgress(p4info_helper, s1, "10.0.1.4", "00:00:00:00:01:04", 2)
+    writeFknEgress(p4info_helper, switches["s1"], "10.0.1.1", "00:00:00:00:01:01", 1)
+    writeFknEgress(p4info_helper, switches["s1"], "10.0.1.5", "00:00:00:00:01:05", 3)
+    writeFknEgress(p4info_helper, switches["s1"], "10.0.1.4", "00:00:00:00:01:04", 2)
     
 
     # TODO Uncomment the following two lines to read table entries from s1 and s2
-    readTableRules(p4info_helper, s1)
-    readTableRules(p4info_helper, s2)
-    readTableRules(p4info_helper, s5)
-    readTableRules(p4info_helper, s7)
-    readTableRules(p4info_helper, s4)
-    readTableRules(p4info_helper, s3)
+    readTableRules(p4info_helper, switches["s1"])
+    readTableRules(p4info_helper, switches["s2"])
+    readTableRules(p4info_helper, switches["s5"])
+    readTableRules(p4info_helper, switches["s7"])
+    readTableRules(p4info_helper, switches["s4"])
+    readTableRules(p4info_helper, switches["s3"])
 
     # polling information # could be dynamic
     # Print the tunnel counters every 2 seconds
+    '''
     try:
         while True:
             sleep(2)
@@ -323,7 +307,7 @@ def main(p4info_file_path, bmv2_file_path):
             printCounter(p4info_helper, s1, "MyIngress.egressTunnelCounter", 1)
     except KeyboardInterrupt:
         print " Shutting down."
-
+    '''
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='P4Runtime Controller')
