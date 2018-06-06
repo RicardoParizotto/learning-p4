@@ -11,8 +11,18 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import p4runtime_lib.bmv2
 import p4runtime_lib.helper
 
-SWITCH_TO_HOST_PORT = 1
-SWITCH_TO_SWITCH_PORT = 2
+
+
+'''
+
+:param p4info_helper: the P4Info helper
+:param ingress_sw: the ingress switch connection
+:param egress_sw: the egress switch connection
+:param tunnel_id: the specified tunnel ID
+:param dst_eth_addr: the destination IP to match in the ingress rule
+:param dst_ip_addr: the destination Ethernet address to write in the
+                    egress rule
+'''
 
 
 '''
@@ -30,28 +40,8 @@ def writeIpv4Rule(p4info_helper, ingress_sw, dst_ip_addr, switch_port):
     ingress_sw.WriteTableEntry(table_entry)
     print "Installed ingress tunnel rule on %s" % ingress_sw.name  
 
-    def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, tunnel_id):
-    table_entry = p4info_helper.buildTableEntry(
-        table_name="MyIngress.ipv4_lpm",
-        match_fields={
-            "hdr.ipv4.dstAddr": (dst_ip_addr, 32)
-        },
-        action_name="MyIngress.myTunnel_ingress",
-        action_params={
-            "dst_id": tunnel_id,
-        })
-    ingress_sw.WriteTableEntry(table_entry)
-    print "Installed ingress tunnel rule on %s" % ingress_sw.name  
-'''
 
-
-
-
-
-
-
-
-def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, ecmp_base, ecmp_max):
+    def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, ecmp_base, ecmp_max):
     table_entry = p4info_helper.buildTableEntry(
         table_name="MyIngress.ipv4_lpm",
         match_fields={
@@ -63,61 +53,32 @@ def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, ecmp_base, ecmp_m
             "ecmp_count": ecmp_max,
         })
     ingress_sw.WriteTableEntry(table_entry)
-    print "Installed ingress tunnel rule on %s" % ingress_sw.name  
+    print "Installed ingress tunnel rule on %s" % ingress_sw.name    
+'''
 
 
-def writeTunnelSwitch(p4info_helper, ingress_sw, tunnel_id, switch_port):
+
+def writeFknEgress(p4info_helper, ingress_sw, dst_ip_addr, dst_addr, switch_port):
     table_entry = p4info_helper.buildTableEntry(
-        table_name="MyIngress.myTunnel_exact",
+        table_name="MyIngress.myFkn_egress",
         match_fields={
-            "hdr.myTunnel.dst_id": tunnel_id
+            "hdr.ipv4.dstAddr": (dst_ip_addr, 32)
         },
-        action_name="MyIngress.myTunnel_forward",
+        action_name="MyIngress.ipv4_forward",
         action_params={
+            "dstAddr": dst_addr,
             "port": switch_port
         })
     ingress_sw.WriteTableEntry(table_entry)
-    print "Installed transit tunnel rule on %s" % ingress_sw.name
+    print "Installed ingress tunnel rule on %s" % ingress_sw.name
 
 
-def writeTunnelEgress(p4info_helper, egress_sw, tunnel_id, dst_eth_addr):
-    table_entry = p4info_helper.buildTableEntry(
-        table_name="MyIngress.myTunnel_exact",
-        match_fields={
-            "hdr.myTunnel.dst_id": tunnel_id
-        },
-        action_name="MyIngress.myTunnel_egress",
-        action_params={
-            "dstAddr": dst_eth_addr,
-            "port": SWITCH_TO_HOST_PORT
-        })
-    egress_sw.WriteTableEntry(table_entry)
-    print "Installed egress tunnel rule on %s" % egress_sw.name
 
-
-def writeTunnelRules(p4info_helper, ingress_sw, egress_sw, tunnel_id,
-                     dst_eth_addr, dst_ip_addr):
-    '''
-    Installs three rules:
-    1) An tunnel ingress rule on the ingress switch in the ipv4_lpm table that
+'''
+1) An tunnel ingress rule on the ingress switch in the ipv4_lpm table that
        encapsulates traffic into a tunnel with the specified ID
-    2) A transit rule on the ingress switch that forwards traffic based on
-       the specified ID
-    3) An tunnel egress rule on the egress switch that decapsulates traffic
-       with the specified ID and sends it to the host
-
-    :param p4info_helper: the P4Info helper
-    :param ingress_sw: the ingress switch connection
-    :param egress_sw: the egress switch connection
-    :param tunnel_id: the specified tunnel ID
-    :param dst_eth_addr: the destination IP to match in the ingress rule
-    :param dst_ip_addr: the destination Ethernet address to write in the
-                        egress rule
-    '''
-    # 1) Tunnel Ingress Rule
-    writeTunnelIngress(p4info_helper, ingress_sw, tunnel_id, dst_ip_addr)
-
-    '''
+'''
+def writeTunnelIngress(p4info_helper, ingress_sw, dst_ip_addr, tunnel_id):
     table_entry = p4info_helper.buildTableEntry(
         table_name="MyIngress.ipv4_lpm",
         match_fields={
@@ -129,7 +90,10 @@ def writeTunnelRules(p4info_helper, ingress_sw, egress_sw, tunnel_id,
         })
     ingress_sw.WriteTableEntry(table_entry)
     print "Installed ingress tunnel rule on %s" % ingress_sw.name
-    '''
+
+'''
+2) A transit rule on the ingress switch that forwards traffic based on
+       the specified ID
 
     # 2) Tunnel Transit Rule
     # The rule will need to be added to the myTunnel_exact table and match on
@@ -146,10 +110,8 @@ def writeTunnelRules(p4info_helper, ingress_sw, egress_sw, tunnel_id,
     # each switch in the path (except the last switch, which has the egress rule),
     # and you will need to select the port dynamically for each switch based on
     # your topology.
-
-    writeTunnelSwitch(p4info_helper, ingress_sw, tunnel_id)
-
-    '''
+'''
+def writeTunnelSwitch(p4info_helper, ingress_sw, tunnel_id, switch_port):
     table_entry = p4info_helper.buildTableEntry(
         table_name="MyIngress.myTunnel_exact",
         match_fields={
@@ -157,11 +119,14 @@ def writeTunnelRules(p4info_helper, ingress_sw, egress_sw, tunnel_id,
         },
         action_name="MyIngress.myTunnel_forward",
         action_params={
-            "port": SWITCH_TO_SWITCH_PORT
+            "port": switch_port
         })
     ingress_sw.WriteTableEntry(table_entry)
     print "Installed transit tunnel rule on %s" % ingress_sw.name
-    '''
+
+'''
+3) An tunnel egress rule on the egress switch that decapsulates traffic
+       with the specified ID and sends it to the host
 
     # 3) Tunnel Egress Rule
     # For our simple topology, the host will always be located on the
@@ -169,9 +134,8 @@ def writeTunnelRules(p4info_helper, ingress_sw, egress_sw, tunnel_id,
     # In general, you will need to keep track of which port the host is
     # connected to.
 
-    writeTunnelEgress(p4info_helpter, egress_sw, tunnel_id, dst_eth_addr)
-
-    '''
+'''
+def writeTunnelEgress(p4info_helper, egress_sw, tunnel_id, dst_eth_addr, switch_port):
     table_entry = p4info_helper.buildTableEntry(
         table_name="MyIngress.myTunnel_exact",
         match_fields={
@@ -180,12 +144,11 @@ def writeTunnelRules(p4info_helper, ingress_sw, egress_sw, tunnel_id,
         action_name="MyIngress.myTunnel_egress",
         action_params={
             "dstAddr": dst_eth_addr,
-            "port": SWITCH_TO_HOST_PORT
+            "port": switch_port
         })
     egress_sw.WriteTableEntry(table_entry)
     print "Installed egress tunnel rule on %s" % egress_sw.name
 
-    '''
 
 def readTableRules(p4info_helper, sw):
     '''
@@ -288,49 +251,36 @@ def main(p4info_file_path, bmv2_file_path):
                                    bmv2_json_file_path=bmv2_file_path)
     print "Installed P4 Program using SetForwardingPipelineConfig on %s" % s7.name
 
-    # Write the rules that tunnel traffic from h1 to h2
-    
-    #writeIpv4Rule(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", switch_port=2)
-    #writeIpv4Rule(p4info_helper, ingress_sw=s2, dst_ip_addr="10.0.7.3", switch_port=5)
-    #writeIpv4Rule(p4info_helper, ingress_sw=s5, dst_ip_addr="10.0.7.3", switch_port=7)
-    #writeIpv4Rule(p4info_helper, ingress_sw=s5, dst_ip_addr="10.0.7.3", switch_port=7)
-
-    writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", ecmp_base=2, ecmp_max=2)    
-
-   # writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", tunnel_id=1)    
-   
-    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=1, switch_port=4)
+    # Write the rules that tunnel traffic from h1 to h3
+    writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.7.3", tunnel_id=1)          
+    writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=1, switch_port=6)
     writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=1, switch_port=2)
-    #writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=100, switch_port=7)
-    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=1, dst_eth_addr="00:00:00:00:07:03")
+    writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=1, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
 
+    
+    writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.1", tunnel_id=4)
+    writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.4", tunnel_id=4)
+    writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.5", tunnel_id=4)         
+    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=4, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s4, tunnel_id=4, switch_port=1)    
+    #writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=4, dst_eth_addr="00:00:00:00:01:01", switch_port=1)
+    #writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=4, dst_eth_addr="00:00:00:00:01:05", switch_port=2) 
+    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=4, dst_eth_addr="00:00:00:00:01:04", switch_port=3)
+    writeFknEgress(p4info_helper, s1, "10.0.1.1", "00:00:00:00:01:01", 1)
+    writeFknEgress(p4info_helper, s1, "10.0.1.5", "00:00:00:00:01:05", 3)
+    writeFknEgress(p4info_helper, s1, "10.0.1.4", "00:00:00:00:01:04", 2)
+    
+    '''
+    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=3, switch_port=3)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=3, switch_port=2)
+    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=3, switch_port=1)
+    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=3, dst_eth_addr="00:00:00:00:01:01")   
 
-    #writeTunnelIngress(p4info_helper, ingress_sw=s1, dst_ip_addr="10.0.0.2", tunnel_id=2)   
 
     writeTunnelSwitch(p4info_helper, ingress_sw=s1, tunnel_id=2, switch_port=2) 
     writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=2, switch_port=2)
     writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=2, switch_port=3)
-    #writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=100, switch_port=7)
     writeTunnelEgress(p4info_helper, egress_sw=s7, tunnel_id=2, dst_eth_addr="00:00:00:00:07:03")
-
-    
-    #writeTunnelIngress(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.1", tunnel_id=3)    
-    writeTunnelSwitch(p4info_helper, ingress_sw=s7, tunnel_id=3, switch_port=3)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s5, tunnel_id=3, switch_port=2)
-    writeTunnelSwitch(p4info_helper, ingress_sw=s2, tunnel_id=3, switch_port=1)
-    writeTunnelEgress(p4info_helper, egress_sw=s1, tunnel_id=3, dst_eth_addr="00:00:00:00:01:01")
-
-
-    '''
-    writeTunnelRules(p4info_helper, ingress_sw=s1, egress_sw=s2, tunnel_id=100,
-                     dst_eth_addr="00:00:00:00:07:03", dst_ip_addr="10.0.7.3")
-
-    writeTunnelRules(p4info_helper, ingress_sw=s2, egress_sw=s5, tunnel_id=100,
-                     dst_eth_addr="00:00:00:00:07:03", dst_ip_addr="10.0.7.3")
-
-    # Write the rules that tunnel traffic from h2 to h1
-    writeTunnelRules(p4info_helper, ingress_sw=s2, egress_sw=s1, tunnel_id=200,
-                     dst_eth_addr="00:00:00:00:01:01", dst_ip_addr="10.0.1.1")
     '''
 
     # TODO Uncomment the following two lines to read table entries from s1 and s2
@@ -338,7 +288,10 @@ def main(p4info_file_path, bmv2_file_path):
     readTableRules(p4info_helper, s2)
     readTableRules(p4info_helper, s5)
     readTableRules(p4info_helper, s7)
+    readTableRules(p4info_helper, s4)
+    readTableRules(p4info_helper, s3)
 
+    # polling information # could be dynamic
     # Print the tunnel counters every 2 seconds
     try:
         while True:
@@ -349,7 +302,7 @@ def main(p4info_file_path, bmv2_file_path):
             printCounter(p4info_helper, s1, "MyEgress.egressCounter", 1)
             printCounter(p4info_helper, s4, "MyIngress.transientTunnelCounter", 1)
             printCounter(p4info_helper, s4, "MyEgress.egressCounter", 1)
-            printCounter(p4info_helper, s7, "MyIngress.egressTunnelCounter", 1)
+            printCounter(p4info_helper, s1, "MyIngress.egressTunnelCounter", 1)
     except KeyboardInterrupt:
         print " Shutting down."
 

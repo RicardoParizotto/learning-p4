@@ -127,24 +127,25 @@ control MyIngress(inout headers hdr,
     }
     
     action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
+	egressTunnelCounter.count((bit<32>) port);
         standard_metadata.egress_spec = port;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
-    action myTunnel_ingress(bit<16> ecmp_base, bit<32> ecmp_count){
-
+    action myTunnel_ingress(bit<16> dst_id){
+ 	/*
         hash(meta.ecmp_select,
 	    HashAlgorithm.crc16,
 	    ecmp_base,
 	    { hdr.ipv4.srcAddr,
 	      hdr.ipv4. fragOffset},
 	    ecmp_count);
-
+	*/
 
         hdr.myTunnel.setValid();
-        hdr.myTunnel.dst_id = (bit<16>) meta.ecmp_select;
+        hdr.myTunnel.dst_id = dst_id;
         hdr.myTunnel.proto_id = hdr.ethernet.etherType;
         hdr.ethernet.etherType = TYPE_MYTUNNEL;
         ingressTunnelCounter.count((bit<32>) hdr.myTunnel.dst_id);
@@ -160,7 +161,6 @@ control MyIngress(inout headers hdr,
         hdr.ethernet.dstAddr = dstAddr;
         hdr.ethernet.etherType = hdr.myTunnel.proto_id;
         hdr.myTunnel.setInvalid();
-        egressTunnelCounter.count((bit<32>) hdr.myTunnel.dst_id);
     }
 
     table ipv4_lpm {
@@ -175,7 +175,6 @@ control MyIngress(inout headers hdr,
         }
         size = 1024;
         default_action = NoAction();
-
     }
 
     table myTunnel_exact {
@@ -191,6 +190,18 @@ control MyIngress(inout headers hdr,
         default_action = drop();
     }
 
+    table myFkn_egress {
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            ipv4_forward;
+            NoAction;
+        }
+        size = 1024;
+        default_action = NoAction;
+    }
+
     apply {
         if (hdr.ipv4.isValid() && !hdr.myTunnel.isValid()) {
             // Process only non-tunneled IPv4 packets.
@@ -201,6 +212,11 @@ control MyIngress(inout headers hdr,
             // Process all tunneled packets.
             myTunnel_exact.apply();
         }
+
+	if (hdr.ipv4.isValid()){
+            //dont know if will work :p
+	    myFkn_egress.apply();
+	}
     }
 }
 
