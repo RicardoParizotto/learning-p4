@@ -59,18 +59,17 @@ def writeIpv4Rule(p4info_helper, ingress_sw, dst_ip_addr, switch_port):
 
 def writeBalancingEntry(p4info_helper, ingress_sw, dst_ip_addr, ecmp_base, ecmp_count, prefix_size):
     table_entry = p4info_helper.buildTableEntry(
-        table_name="MyIngress.ipv4_lpm",
+        table_name="MyEgress.turn_the_gambia_on",
         match_fields={
             "hdr.ipv4.dstAddr": (dst_ip_addr, prefix_size)
         },
-        action_name="MyIngress.set_ecmp",
+        action_name="MyEgress.set_ecmp",
         action_params={
             "ecmp_base": ecmp_base,
             "ecmp_count": ecmp_count
         })
     ingress_sw.WriteTableEntry(table_entry)
     print "Installed ingress tunnel rule on %s" % ingress_sw.name
-
 
 
 def writeFknEgress(p4info_helper, ingress_sw, dst_ip_addr, dst_addr, switch_port):
@@ -257,7 +256,7 @@ def main(p4info_file_path, bmv2_file_path):
     writeTunnelEgress(p4info_helper, egress_sw=switches["s7"], tunnel_id=3, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
 
     #essa linha que tem que mudar
-    writeTunnelIngress(p4info_helper, ingress_sw=switches["s7"], dst_ip_addr="10.0.1.0", tunnel_id=2, prefix_size=24)
+    writeTunnelIngress(p4info_helper, ingress_sw=switches["s7"], dst_ip_addr="10.0.1.0", tunnel_id=1, prefix_size=24)
     #jklasdfjalsjdf;asdf
 
     writeTunnelSwitch(p4info_helper, ingress_sw=switches["s7"], tunnel_id=1, switch_port=2)
@@ -276,7 +275,7 @@ def main(p4info_file_path, bmv2_file_path):
     writeTunnelEgress(p4info_helper, egress_sw=switches["s7"], tunnel_id=4, dst_eth_addr="00:00:00:00:07:03", switch_port=1)
 
 
-    #writeBalancingEntry(p4info_helper, ingress_sw=s7, dst_ip_addr="10.0.1.0", ecmp_base=1, ecmp_count=2 , prefix_size=24)
+    #writeBalancingEntry(p4info_helper, ingress_sw=switches['s7'], dst_ip_addr="10.0.1.0", ecmp_base=1, ecmp_count=2 , prefix_size=24)
 
     #back to the border switch
     writeFknEgress(p4info_helper, switches["s1"], "10.0.1.1", "00:00:00:00:01:01", 1)

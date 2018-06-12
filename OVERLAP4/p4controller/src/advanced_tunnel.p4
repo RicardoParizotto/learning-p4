@@ -5,6 +5,7 @@
 const bit<16> TYPE_MYTUNNEL = 0x1212;
 const bit<16> TYPE_IPV4 = 0x800;
 const bit<32> MAX_TUNNEL_ID = 1 << 16;
+const bit<19> ECN_THRESHOLD = 100;
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
@@ -134,24 +135,6 @@ control MyIngress(inout headers hdr,
     action drop() {
         mark_to_drop();
     }
-
-    action set_ecmp(bit<16> ecmp_base, bit<32> ecmp_count) {
-        hash(meta.ecmp_select,
-	    HashAlgorithm.crc16,
-	    ecmp_base,
-	    { hdr.ipv4.srcAddr,
-	      hdr.ipv4.dstAddr,
-              hdr.ipv4.protocol,
-              hdr.tcp.srcPort,
-              hdr.tcp.dstPort },
-	    ecmp_count);
-
-        hdr.myTunnel.setValid();
-        hdr.myTunnel.dst_id = (bit<16>) meta.ecmp_select;
-        hdr.myTunnel.proto_id = hdr.ethernet.etherType;
-        hdr.ethernet.etherType = TYPE_MYTUNNEL;
-        ingressTunnelCounter.count((bit<32>) hdr.myTunnel.dst_id);
-    }
     
     action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
 	egressTunnelCounter.count((bit<32>) port);
@@ -188,11 +171,10 @@ control MyIngress(inout headers hdr,
         actions = {
             ipv4_forward;
             myTunnel_ingress;
-            set_ecmp;
             drop;
             NoAction;
         }
-        size = 1024;
+        size = 32;
         default_action = NoAction();
     }
 
@@ -205,7 +187,7 @@ control MyIngress(inout headers hdr,
             myTunnel_egress;
             drop;
         }
-        size = 1024;
+        size = 32;
         default_action = drop();
     }
 
@@ -217,14 +199,14 @@ control MyIngress(inout headers hdr,
             ipv4_forward;
             NoAction;
         }
-        size = 1024;
+        size = 32;
         default_action = NoAction;
     }
 
     apply {
         if (hdr.ipv4.isValid() && !hdr.myTunnel.isValid()) {
             // Process only non-tunneled IPv4 packets.
-            ipv4_lpm.apply();
+            ipv4_lpm.apply();	
         }
 
         if (hdr.myTunnel.isValid()) {
@@ -247,28 +229,42 @@ control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
 
-    counter(MAX_TUNNEL_ID, CounterType.packets_and_bytes) egressCounter;
 
+    action set_ecmp(bit<16> ecmp_base, bit<32> ecmp_count) {
+        hash(meta.ecmp_select,
+	    HashAlgorithm.crc16,
+	    ecmp_base,
+	    { hdr.ipv4.srcAddr,
+	      hdr.ipv4.dstAddr,
+              hdr.ipv4.protocol,
+              hdr.tcp.srcPort,
+              hdr.tcp.dstPort },
+	    ecmp_count);
 
-    action count_egress() {
-        egressCounter.count((bit<32>) hdr.myTunnel.dst_id);
+        hdr.myTunnel.setValid();
+        hdr.myTunnel.dst_id = (bit<16>) meta.ecmp_select;
+        hdr.myTunnel.proto_id = hdr.ethernet.etherType;
+        hdr.ethernet.etherType = TYPE_MYTUNNEL;
+            
     }
 
-
-    table out_counter {
+    table turn_the_gambia_on{
         key = {
             hdr.ipv4.dstAddr: lpm;
         }
         actions = {
-            count_egress;
+            set_ecmp;
             NoAction;
         }
-        size = 1024;
-        default_action = count_egress();
+        size = 32;
+        default_action = NoAction();
     }
 
+
     apply { 
-        out_counter.apply();	
+	if (standard_metadata.enq_qdepth >= ECN_THRESHOLD){
+	    turn_the_gambia_on.apply();
+        } 	
     }
 }
 
